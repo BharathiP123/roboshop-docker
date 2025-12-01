@@ -1,28 +1,35 @@
-FROM maven:3.9.11 AS builder
+FROM node:20.19.5-alpine3.21 AS build
 WORKDIR /opt/server
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package && \
-    mv target/shipping-1.0.jar shipping.jar
+COPY package.json .
+COPY *.js .
+# this may add extra cache memory
+RUN npm install 
 
 
-FROM eclipse-temurin:17-jre-alpine
+FROM node:20.19.5-alpine3.21
+# Create a group and user
+WORKDIR /opt/server
+RUN addgroup -S roboshop && adduser -S roboshop -G roboshop && \
+    chown -R roboshop:roboshop /opt/server
 EXPOSE 8080
-RUN addgroup -S roboshop && adduser -S roboshop -G roboshop
-WORKDIR /opt/server
-ENV CART_ENDPOINT="cart:8080" \
-    DB_HOST="mysql"
-COPY --from=builder --chown=roboshop:roboshop /opt/server/shipping.jar .
+LABEL com.project="roboshop" \
+      component="user" \
+      created_by="sivakumar"
+ENV MONGO="true" \
+    REDIS_URL="redis://redis:6379" \
+    MONGO_URL="mongodb://mongodb:27017/users"
+COPY --from=build --chown=roboshop:roboshop /opt/server /opt/server
 USER roboshop
-ENTRYPOINT ["sh", "-c", "sleep 30 && java -jar shipping.jar"]
-# FROM maven:3.9.11
-# EXPOSE 8080
+CMD ["server.js"]
+ENTRYPOINT ["node"]
+
+# FROM node:20
 # WORKDIR /opt/server
-# COPY pom.xml .
-# COPY src ./src
-# RUN mvn clean package
-# RUN mv target/shipping-1.0.jar shipping.jar
-# ENV CART_ENDPOINT="cart:8080" \
-#     DB_HOST="mysql"
-# CMD ["java","-jar","shipping.jar"]
-# CMD ["sleep","1000"]
+# EXPOSE 8080
+# COPY package.json .
+# COPY *.js .
+# RUN npm install
+# ENV MONGO="true" \
+#     REDIS_URL="redis://redis:6379" \
+#     MONGO_URL="mongodb://mongodb:27017/users"
+# CMD ["node", "server.js"]
